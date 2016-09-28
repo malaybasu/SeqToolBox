@@ -56,7 +56,7 @@ sub new {
 	my $seqtoolbox_db = SeqToolBox->new()->get_dbdir();
 	$self->{dbdir} = File::Spec->catdir( $seqtoolbox_db, "taxonomy" );
 	my $gi_taxid_db = File::Spec->catfile( $self->{dbdir}, "gi_taxid_prot.db" );
-	my $gene2accession_db = File::Spec->catfile( $self->{dbdir}, "gene2accession.db" );
+	my $accession2gi_db = File::Spec->catfile( $self->{dbdir}, "accession2gi.db" );
 	my $nodes_db    = File::Spec->catfile( $self->{dbdir}, "nodes.db" );
 	my $names_db    = File::Spec->catfile( $self->{dbdir}, "names.db" );
 
@@ -66,15 +66,15 @@ sub new {
 	$self->{gi_taxid_db}     = $gi_taxid_db;
 	$self->{nodes_db}        = $nodes_db;
 	$self->{names_db} = $names_db;
-	$self->{gene2accession_db} = $gene2accession_db;
+	$self->{accession2gi_db} = $accession2gi_db;
 	$self->{gi_taxid_handle} = DBI->connect( "dbi:SQLite:dbname=$gi_taxid_db",
 								 "", "", { AutoCommit => 0, RaiseError => 1 } );
 	$self->{gi_taxid_statement} = $self->{gi_taxid_handle}
 		->prepare("select tax_id from gi_taxid_prot where gi = ?");
-	$self->{gene2accession_handle} = DBI->connect( "dbi:SQLite:dbname=$gene2accession_db",
+	$self->{accession2gi_handle} = DBI->connect( "dbi:SQLite:dbname=$accession2gi_db",
 									"", "", { AutoCommit => 0, RaiseError => 1 } );
-	$self->{gene2accession_statement} = $self->{gene2accession_handle}
-		->prepare("select protein_gi from gene2accession where protein_accession_version = ?");
+	$self->{accession2gi_statement} = $self->{accession2gi_handle}
+		->prepare("select protein_gi from accession2gi where protein_accession_version = ?");
 
 
 	$self->{nodes_db_handle}
@@ -396,8 +396,8 @@ sub get_taxon {
 	}
 	
 	if ($is_accession){
-		$self->{gene2accession_statement}->execute($accession_id);
-		while (my @row = $self->{gene2accession_statement}->fetchrow_array()){
+		$self->{accession2gi_statement}->execute($accession_id);
+		while (my @row = $self->{accession2gi_statement}->fetchrow_array()){
 			if($row[0]){
 				$id=$row[0];
 			}
@@ -480,8 +480,8 @@ sub DESTROY {
 	$self->{gi_taxid_statement} = undef;
 	eval { $self->{gi_taxid_handle}->disconnect(); };
 
-	$self->{gene2accession_statement} = undef;
-	eval { $self->{gene2accession_handle}->disconnect(); };
+	$self->{accession2gi_statement} = undef;
+	eval { $self->{accession2gi_handle}->disconnect(); };
 
 	eval { $self->{nodes_db_statement}->finish(); };
 	$self->{nodes_db_statement} = undef;
