@@ -56,6 +56,7 @@ sub new {
 	my $seqtoolbox_db = SeqToolBox->new()->get_dbdir();
 	$self->{dbdir} = File::Spec->catdir( $seqtoolbox_db, "taxonomy" );
 	my $gi_taxid_db = File::Spec->catfile( $self->{dbdir}, "gi_taxid_prot.db" );
+	my $gene2accession_db = File::Spec->catfile( $self->{dbdir}, "gene2accession.db" );
 	my $nodes_db    = File::Spec->catfile( $self->{dbdir}, "nodes.db" );
 	my $names_db    = File::Spec->catfile( $self->{dbdir}, "names.db" );
 
@@ -65,12 +66,18 @@ sub new {
 	$self->{gi_taxid_db}     = $gi_taxid_db;
 	$self->{nodes_db}        = $nodes_db;
 	$self->{names_db} = $names_db;
+	$self->{gene2accession_db} = $gene2accession_db;
 	$self->{gi_taxid_handle} = DBI->connect( "dbi:SQLite:dbname=$gi_taxid_db",
 								 "", "", { AutoCommit => 0, RaiseError => 1 } );
 	$self->{gi_taxid_statement} = $self->{gi_taxid_handle}
 		->prepare("select tax_id from gi_taxid_prot where gi = ?");
+	$self->{gene2accession_handle} = DBI->connect( "dbi:SQLite:dbname=$gene2accession_db",
+									"", "", { AutoCommit => 0, RaiseError => 1 } );
+	$self->{gene2accession_statement} = $self->{gene2accession_handle}
+		->prepare("select protein_gi from gene2accession where protein_accession_version = ?");
 
-	$self->{nodes_db_handle} 
+
+	$self->{nodes_db_handle}
 		= DBI->connect( "dbi:SQLite:dbname=$nodes_db", "", "",
 						{ AutoCommit => 0, RaiseError => 1 } );
 	$self->{nodes_db_statement} = $self->{nodes_db_handle}->prepare(
@@ -113,8 +120,10 @@ sub new {
 	return $self;
 	my %c_cache;
 	my %t_cache;
+	my %a_cache;
 	$self->{c_cache} = \%c_cache;
 	$self->{t_cache} = \%t_cache;
+	$self->{a_cache} = \%a_cache;
 }
 
 # _init is where the heavy stuff will happen when new is called
@@ -323,7 +332,7 @@ sub collapse_taxon {
 #			}else {
 #				print STDERR "Could not find $taxid\n";
 			last;
-#			} 
+#			}
 		}
 		$self->{nodes_db_statement}->execute($taxid);
 		my $count = 0;
@@ -363,18 +372,37 @@ sub get_taxon {
 	my ( $self, $gi ) = @_;
 	croak "Gi required in get_taxon\n" unless $gi;
 	my $id;
+	my $is_accession=0;
+	my $accession_id;
 
 	if ( $gi =~ /gi\|(\d+)/i ) {
 		$id = $1;
 	} elsif ( $gi =~ /^(\d+)$/ ) {
 		$id = $gi;
+	} elsif ( $gi=~/^(\S+)$/){
+		$accession_id = $1;
+		$is_accession = 1;
 	} else {
 		croak "Malformed GI: $gi\n";
 	}
-
-	if ( exists $self->{t_cache}->{$id} ) {
-		return $self->{t_cache}->{$id};
+	if ($is_accession){
+		if ( exists $self->{a_cache}->{$accession_id}) {
+			return $self->{a_cache}->{$accession_id};
+		}
+	}else{
+		if ( exists $self->{t_cache}->{$id} ) {
+			return $self->{t_cache}->{$id};
+		}
 	}
+	
+	if ($is_accession){
+		$self->{gene2accession_statement}->execute($accession_id);
+		while (my @row = $self->{gene2accession_statement}->fetchrow_array()){
+			if($row[0]){
+				$id=$row[0];
+			}
+		}
+	}			
 
 #	my $gi_taxid = $self->{gi_taxid_db};
 #	my $dbh = DBI->connect_cached("dbi:SQLite:dbname=$gi_taxid", "","", {RaiseError=>1});
@@ -397,11 +425,12 @@ sub get_taxon {
 	#$dbh->disconnect;
 	#print STDERR "$gi returned more than one taxid\n" if $count > 1;
 	#croak "$gi did not have a taxid\n" unless $taxid;
-
-	$self->{t_cache}->{$id} = $taxid;
-
+	if ($is_accession){
+		$self->{a_cache}->{$accession_id} = $taxid;
+	}else{
+		$self->{t_cache}->{$id} = $taxid;
+	}
 	return $taxid;
-
 }
 
 =head2 get_name()
@@ -410,8 +439,8 @@ Describe your function here
 
 	Usage   :
   	Args    :
-  	Returns : 
-  	
+  	Returns :
+
 =cut
 
 
@@ -422,7 +451,7 @@ sub get_name {
 #	print STDERR "Name:@row\n";
 	if ($row[0]) {
 		return $row[0];
-		
+
 	}else {
 		return;
 	}
@@ -450,6 +479,10 @@ sub DESTROY {
 	}
 	$self->{gi_taxid_statement} = undef;
 	eval { $self->{gi_taxid_handle}->disconnect(); };
+
+	$self->{gene2accession_statement} = undef;
+	eval { $self->{gene2accession_handle}->disconnect(); };
+
 	eval { $self->{nodes_db_statement}->finish(); };
 	$self->{nodes_db_statement} = undef;
 	eval { $self->{nodes_db_handle}->disconnect(); };
