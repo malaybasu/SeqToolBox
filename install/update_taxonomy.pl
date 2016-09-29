@@ -45,6 +45,9 @@ my $TAXID_PROT = "gi_taxid_prot.dmp.gz";
 my $DELNODES   = "delnodes.dmp";
 my $MERGED     = "merged.dmp";
 
+my $NCBI_GENE = "ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/";
+my $ACCESSION = "gene2accession.gz";
+
 #
 my $db = SeqToolBox->new()->get_dbdir();
 my $taxdb = File::Spec->catfile( $db, 'taxonomy' );
@@ -81,24 +84,24 @@ $archive->extract_file( "nodes.dmp",
 my $fh = IO::File->new( File::Spec->catfile( $taxdb, "nodes.dmp" ) );
 create_db( $fh, "nodes.dmp",
 		   [ "tax_id", "parent_tax_id", "rank", "division_id" ],
-		   [ 0,        1,               2,      4 ],
+		  #  [ 0,        1,               2,      4 ],
+       [ 1,        2,               3,      5 ],
 		   [ "tax_id", "parent_tax_id" ] );
 close($fh);
 
 $archive->extract_file( "names.dmp",
 						File::Spec->catfile( $taxdb, "names.dmp" ) );
 
-$fh = IO::File->new(File::Spec->catfile($taxdb,"names.dmp"));
-create_db ($fh, "names.dmp",
-			["tax_id","name","unique_name","name_class"],
-			[0,1,2,3],
-			["tax_id"]
-);
+$fh = IO::File->new( File::Spec->catfile( $taxdb, "names.dmp" ) );
+create_db( $fh, "names.dmp",
+		   [ "tax_id", "name", "unique_name", "name_class" ],
+		   [ 1,        2,      3,             4 ],
+		   ["tax_id"] );
 
-#create_db( "", "names.dmp",
-#		   [ "tax_id", "name", "unique_name", "name_class" ],
-#		   [ 0,        1,      2,             3 ],
-#		   ["tax_id"] );
+# create_db( "", "names.dmp",
+# 		   [ "tax_id", "name", "unique_name", "name_class" ],
+# 		   [ 1,        2,      3,            4 ],
+# 		   ["tax_id"] );
 
 close($fh);
 system("rm $LOCAL_TAXDUMP") == 0 or die "Can't remove $LOCAL_TAXDUMP\n";
@@ -108,6 +111,21 @@ system("rm $LOCAL_TAXDUMP_INPUTFILE") == 0
 $LOCAL_TAXDUMP_INPUTFILE = File::Spec->catfile( $taxdb, "names.dmp" );
 system("rm $LOCAL_TAXDUMP_INPUTFILE") == 0
   or die "Can't remove $LOCAL_TAXDUMP_INPUTFILE\n";
+
+# add accssion2gi database;
+my $LOCAL_ACCESSION = File::Spec->catfile( $taxdb, $ACCESSION );
+download( $LOCAL_ACCESSION, $NCBI_GENE, $ACCESSION );
+print STDERR "Unzipping $LOCAL_ACCESSION\n";
+
+Archive::Extract->new( archive => $LOCAL_ACCESSION )->extract( to => $taxdb );
+system("rm $LOCAL_ACCESSION");
+$fh = IO::File->new( File::Spec->catfile( $taxdb, "gene2accession" ) );
+create_db( $fh, "gene2accession", [ "protein_accession_version", "protein_gi" ], [6,7], ["protein_accession_version"] );
+close($fh);
+$LOCAL_ACCESSION_INPUTFILE = File::Spec->catfile( $taxdb, "gene2accession" );
+system("rm $LOCAL_ACCESSION_INPUTFILE") == 0
+  or die "Can't remove $LOCAL_ACCESSION_INPUTFILE\n";
+
 
 #$archive->extract_file ('delnodes.dmp', File::Spec->catfile($taxdb, "delnodes.dmp"));
 #$archive->extract_file('merged.dmp'), File::Spec->catfile($taxdb,"merged.dmp");
@@ -195,10 +213,16 @@ sub create_db {
 	my ( $fh, $file, $field_names, $col_index, $indexes ) = @_;
 
 	#$archive->extract($file);
-	$file =~ /(\S+)\.dmp/;
-	my $base          = $1;
+  my $base;
+
+  if ($file =~ /(\S+)\.dmp/){
+     $base          = $1;
+  }else{
+     $base          = 'accession2gi';
+  }
 	my $dbname        = File::Spec->catfile( $taxdb, $base . '.db' );
 	my $fullinputfile = File::Spec->catfile( $taxdb, $file );
+  my $fulltempfile  = File::Spec->catfile( $taxdb, $base . '.temp');
 	if ( -s $dbname ) { unlink $dbname }
 	my $dbh = DBI->connect( "dbi:SQLite:dbname=$dbname", "", "",
 							{ RaiseError => 1, AutoCommit => 0 } );
@@ -209,31 +233,27 @@ sub create_db {
 
 	if ($fh) {
 		my $num = scalar( @{$field_names} );
-		$sql =
-		    'insert into ' 
-		  . $base . '('
-		  . join( ",", @{$field_names} )
-		  . ') values('
-		  . join( ",", split( //, "?" x $num ) ) . ')';
-		print STDERR $sql, "\n";
-		my $sth = $dbh->prepare($sql);
-		populate_tables( $fh, $dbh, $sth, $file, $col_index );
-		$dbh->commit();
-		$sth->finish;
-		$sth = undef;
-
-		$dbh->disconnect;
-	} else {
-		$dbh->commit();
-		$dbh->disconnect;
-
-		print STDERR "Direct import: Creating $dbname\n";
-		`sqlite3 $dbname << ENDINPUT
+    extract_file( $fh, $fullinputfile, $fulltempfile, $base, $col_index );
+    # populate_tables( $fh, $dbh, $sth, $file, $col_index );
+    $dbh->commit();
+    $dbh->disconnect;
+    print STDERR "Import after filtering : Creating $dbname\n";
+    `sqlite3 $dbname << ENDINPUT
+.separator \\t
+\.import $fulltempfile $base
+\.quit
+ENDINPUT`;
+  }else{
+    $dbh->commit();
+    $dbh->disconnect;
+    print STDERR "Direct import: Creating $dbname\n";
+    `sqlite3 $dbname << ENDINPUT
 .separator \\t
 \.import $fullinputfile $base
 \.quit
 ENDINPUT`;
-	}
+  }
+
 
 	print STDERR "After disconnect\n";
 
@@ -241,15 +261,13 @@ ENDINPUT`;
 		my $dbh = DBI->connect( "dbi:SQLite:dbname=$dbname", "", "",
 								{ RaiseError => 1, AutoCommit => 0 } );
 		$sql =
-		    'create index index1 on ' 
+		    'create index index1 on '
 		  . $base . '('
 		  . join( ",", @{$indexes} ) . ')';
 		print STDERR "$sql\n";
 		$dbh->do($sql);
 		$dbh->commit();
 		$dbh->disconnect;
-
-		#		$dbh->commit();
 	}
 
 	#	print STDERR "$sql\n";
@@ -262,8 +280,58 @@ ENDINPUT`;
 	#	$sth1 = undef;
 
 	#unlink $file;
+  if($fh){
+    system("rm $fulltempfile") == 0
+      or die "Can't remove $fulltempfile\n";
+  }
+
 }
 
+sub extract_file {
+  my ( $fh, $fullinputfile, $fulltempfile, $base, $col) = @_;
+  my $fullcutfile  = File::Spec->catfile( $taxdb, $base . '.cut');
+  print STDERR "Extract...";
+  my $firstLine = <$fh>;
+
+  chomp $firstLine;
+
+  my $bar=()=$firstLine=~/\|/g;
+  my $tab=()=$firstLine=~/\t/g;
+
+
+  {local $"=",";
+    if ( $bar>$tab) {
+      system("cat $fullinputfile | sed '/#/d' |cut -d '|' -f @{$col} > $fullcutfile");
+    } else {
+      system("cat $fullinputfile | sed '/#/d' | cut -f @{$col} > $fullcutfile");
+    }
+  }
+
+  my $fileh = IO::File->new( File::Spec->catfile( $fullcutfile ) );
+  while(my $line=<$fileh>){
+    chomp $line;
+    my @f;
+    my @values;
+    if (!($line=~/-\t-/)){
+      @f=split(/\t/,$line);
+      foreach my $i (@f) {
+        $i =~ s/^\s+//;
+        $i =~ s/\s+$//;
+        my $v = $i ? $i : "";
+        push @values, $i;
+      }
+
+    local $" = "\t";
+    open(my $fileh, '>>', $fulltempfile) or die "Could not open file '$fulltempfile' $!";
+    print $fileh "@values\n";
+    close $fileh;
+    }
+  }
+  print STDERR "done.\n";
+  system("rm $fullcutfile") == 0
+    or die "Can't remove $fullcutfile\n";
+}
+=put
 sub populate_tables {
 	my ( $fh, $d, $s, $file, $col ) = @_;
 
@@ -274,13 +342,21 @@ sub populate_tables {
 	while ( my $line = <$fh> ) {
 		chomp $line;
 		my @f;
+    my $bar=()=$line=~/\|/gi;
+    my $tab=()=$line=~/\t/gi;
+      if ( $bar>$tab) {
+        $line =~ s/\|$//;
+        @f = split( /\|/, $line );
+      } else {
+        @f = split( /\t/, $line );
+      }
+    # if ( $line =~ /\|/ ) {
+    #   $line =~ s/\|$//;
+    #   @f = split( /\|/, $line );
+    # } else {
+    #   @f = split( /\t/, $line );
+    # }
 
-		if ( $line =~ /\|/ ) {
-			$line =~ s/\|$//;
-			@f = split( /\|/, $line );
-		} else {
-			@f = split( /\t/, $line );
-		}
 		my @values;
 
 		foreach my $i (@f) {
@@ -317,7 +393,7 @@ sub populate_tables {
 
 	#close ($fh);
 }
-
+=cut
 #$dbh->disconnect();
 
 __END__
@@ -384,7 +460,7 @@ Malay K Basu <malay@bioinformatics.org>
 #  # a duplicate "USAGE()" subroutine.  Instead we
 #  # just recycle our POD docs.  See PERL POD for more
 #  # details.
-#  
+#
 #  exec "pod2text $0";
 #  die;
 #}

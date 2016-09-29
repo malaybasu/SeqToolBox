@@ -50,8 +50,8 @@ my $LSF;
 my $LSF_OPTIONS = "";
 
 if ( $engine eq "SGE" ) {
-    $LSF         = "qsub";
-    $LSF_OPTIONS = "-b y -j y -V ";
+    $LSF         = "qsub -q genifx.q";
+    $LSF_OPTIONS = "-b y -j y -V -cwd ";
 
     if ($project_code) {
         $LSF_OPTIONS .= " -P $project_code";
@@ -244,7 +244,7 @@ if ($composite_output) {
     opendir( DIR, $OUTPUT_DIR ) or die "Can't open $OUTPUT_DIR\n";
 
     if ( $opt{o} =~ /\.bz2$/ ) {
-        open( OUTFILE, "|pbzip2 -c -9 >$opt{o}" ) || die "Can't open $opt{o}\n";
+        open( OUTFILE, "|lbzip2 -c -9 >$opt{o}" ) || die "Can't open $opt{o}\n";
     }
     elsif ( $opt{o} =~ /\.gz$/ ) {
         open( OUTFILE, "|gzip -c -9 >$opt{o}" ) || die "Can't open $opt{o}\n";
