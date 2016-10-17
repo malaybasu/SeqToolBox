@@ -70,7 +70,7 @@ print STDERR "Unzipping $LOCAL_TAXID_PROT\n";
 Archive::Extract->new( archive => $LOCAL_TAXID_PROT )->extract( to => $taxdb );
 system("rm $LOCAL_TAXID_PROT");
 my $LOCAL_TAXID_INPUT_FILE = File::Spec->catfile( $taxdb, "gi_taxid_prot.dmp" );
-create_db( "", "gi_taxid_prot.dmp", [ "gi", "tax_id" ], [ 0, 1 ], ["gi"] );
+create_db( "", "gi_taxid_prot.dmp", [ "gi", "tax_id" ], [ 1, 2], ["gi"] );
 system("rm $LOCAL_TAXID_INPUT_FILE") == 0
   or die "Can't remove $LOCAL_TAXID_INPUT_FILE\n";
 
