@@ -122,7 +122,7 @@ system("rm $LOCAL_ACCESSION");
 $fh = IO::File->new( File::Spec->catfile( $taxdb, "gene2accession" ) );
 create_db( $fh, "gene2accession", [ "protein_accession_version", "protein_gi" ], [6,7], ["protein_accession_version"] );
 close($fh);
-$LOCAL_ACCESSION_INPUTFILE = File::Spec->catfile( $taxdb, "gene2accession" );
+my $LOCAL_ACCESSION_INPUTFILE = File::Spec->catfile( $taxdb, "gene2accession" );
 system("rm $LOCAL_ACCESSION_INPUTFILE") == 0
   or die "Can't remove $LOCAL_ACCESSION_INPUTFILE\n";
 
