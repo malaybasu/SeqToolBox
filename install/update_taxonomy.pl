@@ -1,3 +1,11 @@
+# @Author: Lijia Yu <lijia>
+# @Date:   2016-10-17 11:59 -05:00
+# @Email:  yulj2010@gmail.com
+# @Last modified by:   lijia
+# @Last modified time: 2016-10-17 17:14 -05:00
+
+
+
 #!/usr/bin/env perl
 BEGIN { $^W = 1 }
 
@@ -104,6 +112,7 @@ create_db( $fh, "names.dmp",
 # 		   ["tax_id"] );
 
 close($fh);
+
 system("rm $LOCAL_TAXDUMP") == 0 or die "Can't remove $LOCAL_TAXDUMP\n";
 my $LOCAL_TAXDUMP_INPUTFILE = File::Spec->catfile( $taxdb, "nodes.dmp" );
 system("rm $LOCAL_TAXDUMP_INPUTFILE") == 0
@@ -298,10 +307,9 @@ sub extract_file {
   my $bar=()=$firstLine=~/\|/g;
   my $tab=()=$firstLine=~/\t/g;
 
-
   {local $"=",";
-    if ( $bar>$tab) {
-      system("cat $fullinputfile | sed '/#/d' |cut -d '|' -f @{$col} > $fullcutfile");
+    if ( $bar>0) {
+      system("cat $fullinputfile | sed '/#/d' |cut -d '|' -f @{$col} | tr -d \"\t\" | gawk 'BEGIN{FS=\"|\";OFS=\"\t\"}{\$1=\$1; print \$0}' > $fullcutfile"); #
     } else {
       system("cat $fullinputfile | sed '/#/d' | cut -f @{$col} > $fullcutfile");
     }
