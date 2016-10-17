@@ -394,7 +394,7 @@ sub get_taxon {
 			return $self->{t_cache}->{$id};
 		}
 	}
-	
+
 	if ($is_accession){
 		$self->{accession2gi_statement}->execute($accession_id);
 		while (my @row = $self->{accession2gi_statement}->fetchrow_array()){
@@ -402,7 +402,7 @@ sub get_taxon {
 				$id=$row[0];
 			}
 		}
-	}			
+	}
 
 #	my $gi_taxid = $self->{gi_taxid_db};
 #	my $dbh = DBI->connect_cached("dbi:SQLite:dbname=$gi_taxid", "","", {RaiseError=>1});
@@ -477,17 +477,29 @@ sub DESTROY {
 	if ( $self->{gi_texid_statement} ) {
 		$self->{gi_taxid_statement}->finish();
 	}
-	$self->{gi_taxid_statement} = undef;
+	# $self->{gi_taxid_statement} = undef;
 	eval { $self->{gi_taxid_handle}->disconnect(); };
 
-	$self->{accession2gi_statement} = undef;
-	eval { $self->{accession2gi_handle}->disconnect(); };
+	if ($self->{accession2gi_statement}){
+		$self->{accession2gi_statement}->finish();
+	}
+	# $self->{accession2gi_statement} = undef;
+	eval { $self->{accession2gi_handle}->disconnect();};
 
-	eval { $self->{nodes_db_statement}->finish(); };
-	$self->{nodes_db_statement} = undef;
+	if ($self->{nodes_db_statement}){
+		$self->{nodes_db_statement}->finish();
+	}
+	# $self->{nodes_db_statement} = undef;
 	eval { $self->{nodes_db_handle}->disconnect(); };
-	$self->{names_db_statement} = undef;
-	eval { $self->{names_db_handle}->disconnect();};
+
+	if($self->{names_db_statement}){
+		$self->{names_db_statement}->finish();
+	}
+	if($self->{names_db_taxid_by_sc_name_statement}){
+			$self->{names_db_taxid_by_sc_name_statement}->finish();
+		}
+	# $self->{names_db_statement} = undef;
+	eval { $self->{names_db_handle}->disconnect(); };
 }
 
 =head1 SEE ALSO
