@@ -14,3 +14,6 @@ is ("1578", $obj->classify_taxon(417412, 1578));
 is ("Escherichia coli str. K-12 substr. MG1655", $obj->get_name(511145));
 #is ("cyanobacteria", $obj->classify(123610141));
 is ("9606", $obj->get_taxid_by_name("Homo sapiens"));
+## test of acessionID2gi2taxid
+is("336963",$obj->get_taxon(258571133));
+is("336963",$obj->get_taxon("XP_002544370.1"));
