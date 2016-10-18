@@ -166,7 +166,7 @@ sub classify {
 	#	my $gi_taxid = $self->{dbdir}.'/gi_taxid.db';
 	my $gi_taxid = $self->{gi_taxid_db};
 	my $dbh      = DBI->connect( "dbi:SQLite:dbname=$gi_taxid", "", "",
-							{ ReadOnly => 1 } );
+							{ RaiseError => 1, ReadOnly => 1 } );
 	my $sth = $dbh->prepare("select tax_id from gi_taxid_prot where gi = ?");
 	$sth->execute($gi);
 	my $count = 0;
