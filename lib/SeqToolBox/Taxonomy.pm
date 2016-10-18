@@ -74,7 +74,7 @@ sub new {
 	$self->{accession2gi_handle} = DBI->connect( "dbi:SQLite:dbname=$accession2gi_db",
 									"", "", { AutoCommit => 0, RaiseError => 1 } );
 	$self->{accession2gi_statement} = $self->{accession2gi_handle}
-		->prepare("select protein_gi from accession2gi where protein_accession_version = ?");
+		->prepare("select gi from accession2gi where  accession = ?");
 
 
 	$self->{nodes_db_handle}
@@ -374,6 +374,7 @@ sub get_taxon {
 	my $id;
 	my $is_accession=0;
 	my $accession_id;
+  my @accession;
 
 	if ( $gi =~ /gi\|(\d+)/i ) {
 		$id = $1;
@@ -386,8 +387,9 @@ sub get_taxon {
 		croak "Malformed GI: $gi\n";
 	}
 	if ($is_accession){
-		if ( exists $self->{a_cache}->{$accession_id}) {
-			return $self->{a_cache}->{$accession_id};
+		@accession=split(/\./,$accession_id);
+		if ( exists $self->{a_cache}->{$accession[0]}) {
+			return $self->{a_cache}->{$accession[0]};
 		}
 	}else{
 		if ( exists $self->{t_cache}->{$id} ) {
@@ -396,7 +398,7 @@ sub get_taxon {
 	}
 
 	if ($is_accession){
-		$self->{accession2gi_statement}->execute($accession_id);
+		$self->{accession2gi_statement}->execute($accession[0]);
 		while (my @row = $self->{accession2gi_statement}->fetchrow_array()){
 			if($row[0]){
 				$id=$row[0];
@@ -426,7 +428,7 @@ sub get_taxon {
 	#print STDERR "$gi returned more than one taxid\n" if $count > 1;
 	#croak "$gi did not have a taxid\n" unless $taxid;
 	if ($is_accession){
-		$self->{a_cache}->{$accession_id} = $taxid;
+		$self->{a_cache}->{$accession[0]} = $taxid;
 	}else{
 		$self->{t_cache}->{$id} = $taxid;
 	}

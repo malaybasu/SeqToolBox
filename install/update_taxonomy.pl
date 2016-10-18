@@ -1,11 +1,3 @@
-# @Author: Lijia Yu <lijia>
-# @Date:   2016-10-17 11:59 -05:00
-# @Email:  yulj2010@gmail.com
-# @Last modified by:   lijia
-# @Last modified time: 2016-10-17 17:14 -05:00
-
-
-
 #!/usr/bin/env perl
 BEGIN { $^W = 1 }
 
@@ -53,8 +45,8 @@ my $TAXID_PROT = "gi_taxid_prot.dmp.gz";
 my $DELNODES   = "delnodes.dmp";
 my $MERGED     = "merged.dmp";
 
-my $NCBI_GENE = "ftp://ftp.ncbi.nlm.nih.gov/gene/DATA/";
-my $ACCESSION = "gene2accession.gz";
+my $NCBI_GENE = "ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/accession2taxid/";
+my $ACCESSION = "prot.accession2taxid.gz"; # gene2accession.gz
 
 #
 my $db = SeqToolBox->new()->get_dbdir();
@@ -128,10 +120,10 @@ print STDERR "Unzipping $LOCAL_ACCESSION\n";
 
 Archive::Extract->new( archive => $LOCAL_ACCESSION )->extract( to => $taxdb );
 system("rm $LOCAL_ACCESSION");
-$fh = IO::File->new( File::Spec->catfile( $taxdb, "gene2accession" ) );
-create_db( $fh, "gene2accession", [ "protein_accession_version", "protein_gi" ], [6,7], ["protein_accession_version"] );
+my $fh = IO::File->new( File::Spec->catfile( $taxdb, "prot.accession2taxid" ) );
+create_db( $fh, "prot.accession2taxid", [ "accession", "gi" ], [1,4], ["accession"] );
 close($fh);
-my $LOCAL_ACCESSION_INPUTFILE = File::Spec->catfile( $taxdb, "gene2accession" );
+my $LOCAL_ACCESSION_INPUTFILE = File::Spec->catfile( $taxdb, "prot.accession2taxid" );
 system("rm $LOCAL_ACCESSION_INPUTFILE") == 0
   or die "Can't remove $LOCAL_ACCESSION_INPUTFILE\n";
 
@@ -310,31 +302,32 @@ sub extract_file {
   {local $"=",";
     if ( $bar>0) {
       system("cat $fullinputfile | sed '/#/d' |cut -d '|' -f @{$col} | tr -d \"\t\" | gawk 'BEGIN{FS=\"|\";OFS=\"\t\"}{\$1=\$1; print \$0}' > $fullcutfile"); #
+        my $fileh = IO::File->new( File::Spec->catfile( $fullcutfile ) );
+        while(my $line=<$fileh>){
+          chomp $line;
+          my @f;
+          my @values;
+          if (!($line=~/-\t-/)){
+            @f=split(/\t/,$line);
+            foreach my $i (@f) {
+              $i =~ s/^\s+//;
+              $i =~ s/\s+$//;
+              my $v = $i ? $i : "";
+              push @values, $i;
+            }
+
+          local $" = "\t";
+          open(my $fileh, '>>', $fulltempfile) or die "Could not open file '$fulltempfile' $!";
+          print $fileh "@values\n";
+          close $fileh;
+          }
+        }
     } else {
       system("cat $fullinputfile | sed '/#/d' | cut -f @{$col} > $fullcutfile");
+      system("cp $fullcutfile $fulltempfile")
     }
   }
 
-  my $fileh = IO::File->new( File::Spec->catfile( $fullcutfile ) );
-  while(my $line=<$fileh>){
-    chomp $line;
-    my @f;
-    my @values;
-    if (!($line=~/-\t-/)){
-      @f=split(/\t/,$line);
-      foreach my $i (@f) {
-        $i =~ s/^\s+//;
-        $i =~ s/\s+$//;
-        my $v = $i ? $i : "";
-        push @values, $i;
-      }
-
-    local $" = "\t";
-    open(my $fileh, '>>', $fulltempfile) or die "Could not open file '$fulltempfile' $!";
-    print $fileh "@values\n";
-    close $fileh;
-    }
-  }
   print STDERR "done.\n";
   system("rm $fullcutfile") == 0
     or die "Can't remove $fullcutfile\n";
