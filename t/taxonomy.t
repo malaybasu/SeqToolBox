@@ -17,3 +17,12 @@ is ("9606", $obj->get_taxid_by_name("Homo sapiens"));
 ## test of acessionID2gi2taxid
 is("336963",$obj->get_taxon(258571133));
 is("336963",$obj->get_taxon("XP_002544370.1"));
+
+my $file="./name.list";
+open (my $INPUT, $file) || die "Couldn't open $file\n";
+
+while (my $line=<$INPUT>)
+{  chomp $line;
+   print $obj->get_taxon("$line")."\n";
+}
+close($INPUT);
