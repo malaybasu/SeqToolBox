@@ -68,23 +68,23 @@ sub new {
 	$self->{names_db} = $names_db;
 	$self->{accession2gi_db} = $accession2gi_db;
 	$self->{gi_taxid_handle} = DBI->connect( "dbi:SQLite:dbname=$gi_taxid_db",
-								 "", "", { AutoCommit => 0, RaiseError => 1 } );
+								 "", "", {RaiseError => 1, ReadOnly => 1 } );
 	$self->{gi_taxid_statement} = $self->{gi_taxid_handle}
 		->prepare("select tax_id from gi_taxid_prot where gi = ?");
 	$self->{accession2gi_handle} = DBI->connect( "dbi:SQLite:dbname=$accession2gi_db",
-									"", "", { AutoCommit => 0, RaiseError => 1 } );
+									"", "", {RaiseError => 1,ReadOnly => 1 } );
 	$self->{accession2gi_statement} = $self->{accession2gi_handle}
-		->prepare("select gi from accession2gi where  accession = ?");
+		->prepare("select gi from accession2gi where accession = ?");
 
 
 	$self->{nodes_db_handle}
 		= DBI->connect( "dbi:SQLite:dbname=$nodes_db", "", "",
-						{ AutoCommit => 0, RaiseError => 1 } );
+						{RaiseError => 1 ,ReadOnly => 1 } );
 	$self->{nodes_db_statement} = $self->{nodes_db_handle}->prepare(
 					   "select parent_tax_id,rank from nodes where tax_id = ?");
 	$self->{names_db_handle} =
 		DBI->connect( "dbi:SQLite:dbname=$names_db", "", "",
-					  { AutoCommit => 0, RaiseError => 1 } );
+					  {RaiseError => 1 ,ReadOnly => 1 } );
 	$self->{names_db_statement}
 		= $self->{names_db_handle}->prepare("select name from names where (tax_id=? and name_class='scientific name')");
 	$self->{names_db_taxid_by_sc_name_statement} =
@@ -166,7 +166,7 @@ sub classify {
 	#	my $gi_taxid = $self->{dbdir}.'/gi_taxid.db';
 	my $gi_taxid = $self->{gi_taxid_db};
 	my $dbh      = DBI->connect( "dbi:SQLite:dbname=$gi_taxid", "", "",
-							{ RaiseError => 1 } );
+							{ ReadOnly => 1 } );
 	my $sth = $dbh->prepare("select tax_id from gi_taxid_prot where gi = ?");
 	$sth->execute($gi);
 	my $count = 0;
@@ -192,7 +192,7 @@ sub classify {
 	#	my $nodesdb = $self->{dbdir}.'/nodes.db';
 	my $nodesdb = $self->{nodes_db};
 	$dbh = DBI->connect( "dbi:SQLite:dbname=$nodesdb", "", "",
-						 { AutoCommit => 0, RaiseError => 1 } );
+						 {  RaiseError => 1, ReadOnly => 1 } );
 	$sth = $dbh->prepare("select parent_tax_id from nodes where tax_id = ?");
 	my $class;
 
