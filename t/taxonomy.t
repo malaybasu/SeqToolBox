@@ -18,7 +18,7 @@ is ("9606", $obj->get_taxid_by_name("Homo sapiens"));
 is("336963",$obj->get_taxon(258571133));
 is("336963",$obj->get_taxon("XP_002544370.1"));
 
-my $file="./name.list";
+my $file="./name.list.new";
 open (my $INPUT, $file) || die "Couldn't open $file\n";
 
 while (my $line=<$INPUT>)
